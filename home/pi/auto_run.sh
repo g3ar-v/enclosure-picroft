@@ -32,7 +32,7 @@ if [ "$SSH_CLIENT" = "" ] && [ "$(/usr/bin/tty)" != "/dev/tty1" ]; then
     return 0
 fi
 
-export PATH="$HOME/bin:$HOME/mycroft-core/bin:$PATH"
+export PATH="$HOME/bin:$HOME/__core__/bin:$PATH"
 
 # Read any saved setup choices
 if [ -f ~/.setup_choices ]
@@ -213,22 +213,25 @@ function update_software() {
         echo "**** Checking for updates to Picroft environment"
         echo "This might take a few minutes, please be patient..."
 
-        cd /tmp
-        wget -N -q https://raw.githubusercontent.com/MycroftAI/enclosure-picroft/buster/home/pi/version >/dev/null
-        if [ $? -eq 0 ]
-        then
-            if [ ! -f ~/version ] ; then
-                echo "unknown" > ~/version
-            fi
+        cd /tmp || exit
 
-            cmp /tmp/version ~/version
-            if  [ $? -eq 1 ]
-            then
-                # Versions don't match...update needed
-                echo "**** Update found, downloading new Picroft scripts!"
-                speak "Updating Picroft, please hold on."
+        wget -N -q https://raw.githubusercontent.com/g3ar-v/enclosure-picroft/buster/home/pi/version >/dev/null
+          # wget -N -q https://raw.githubusercontent.com/MycroftAI/enclosure-picroft/buster/home/pi/version >/dev/null
+          if [ $? -eq 0 ]
+          then
+              if [ ! -f ~/version ] ; then
+                  echo "unknown" > ~/version
+              fi
 
-                wget -N -q https://raw.githubusercontent.com/MycroftAI/enclosure-picroft/buster/home/pi/update.sh
+              cmp /tmp/version ~/version
+              if  [ $? -eq 1 ]
+              then
+                  # Versions don't match...update needed
+                  echo "**** Update found, downloading new Picroft scripts!"
+                  speak "Updating Picroft, please hold on."
+
+                  wget -N -q https://raw.githubusercontent.com/g3ar-v/enclosure-picroft/buster/home/pi/update.sh
+                  # wget -N -q https://raw.githubusercontent.com/MycroftAI/enclosure-picroft/buster/home/pi/update.sh
                 if [ $? -eq 0 ]
                 then
                     source update.sh
@@ -245,8 +248,8 @@ function update_software() {
         fi
 
         # TODO: Skip update check if done recently?
-        echo -n "Checking for mycroft-core updates..."
-        cd ~/mycroft-core
+        echo -n "Checking for __core__ updates..."
+        cd ~/__core__ || exit
 
         git fetch
         if [ $(git rev-parse HEAD) != $(git rev-parse @{u}) ] ; then
@@ -254,7 +257,7 @@ function update_software() {
             sudo apt-get -o Acquire::ForceIPv4=true update -y
             bash dev_setup.sh
         fi
-        cd ~
+        cd ~ || exit
     fi
 }
 
@@ -275,8 +278,8 @@ function setup_wizard() {
     fi
 
 
-    # Check for/download new software (including mycroft-core dependencies, while we are at it).
-    echo '{"use_branch":"master", "auto_update": true}' > ~/mycroft-core/.dev_opts.json
+    # Check for/download new software (including core-core dependencies, while we are at it).
+    echo '{"use_branch":"dev", "auto_update": true}' > ~/__core__/.dev_opts.json
     update_software
 
     # installs Pulseaudio if not already installed
@@ -289,7 +292,7 @@ function setup_wizard() {
         echo
         echo "========================================================================="
         echo "HARDWARE SETUP"
-        echo "How do you want Mycroft to output audio:"
+        echo "How do you want core to output audio:"
         echo "  1) Speakers via 3.5mm output (aka 'audio jack' or 'headphone jack')"
         echo "  2) HDMI audio (e.g. a TV or monitor with built-in speakers)"
         echo "  3) USB audio (e.g. a USB soundcard or USB mic/speaker combo)"
@@ -355,17 +358,17 @@ function setup_wizard() {
                 # See: https://github.com/google/aiyprojects-raspbian/issues/297
                 sudo sed -i -e "s/^load-module module-suspend-on-idle/#load-module module-suspend-on-idle/" /etc/pulse/default.pa
 
-                # Changes mycroft.conf to use the default output device
+                # Changes core.conf to use the default output device
                 sudo sed -i \
                     -e "s/aplay -Dhw:0,0 %1/aplay %1/" \
                     -e "s/mpg123 -a hw:0,0 %1/mpg123 %1/" \
-                    /etc/mycroft/mycroft.conf
+                    /etc/core/core.conf
 
                 # Install asound.conf
                 sudo cp AIY-asound.conf /etc/asound.conf
 
                 # rebuild venv
-                bash mycroft-core/dev_setup.sh
+                bash __core__/dev_setup.sh
 
                 echo "Reboot is required, restarting in 5 seconds..."
                 audio="google_aiy"
@@ -693,10 +696,10 @@ function setup_wizard() {
 
 function speak() {
     # Generate TTS audio using Mimic 1
-    ~/mycroft-core/mimic/bin/mimic -t $@ -o /tmp/speak.wav
+    ~/__core__/.venv/bin/mimic3 "$@" -o /tmp/speak.wav
 
     # Play the audio using the configured WAV output mechanism
-    wavcmd=$( jq -r ".play_wav_cmdline" /etc/mycroft/mycroft.conf )
+    wavcmd=$( jq -r ".play_wav_cmdline" /etc/core/core.conf )
     wavcmd="${wavcmd/\%1/\/tmp\/speak.wav}"
     $( $wavcmd >/dev/null 2>&1 )
 }
@@ -717,13 +720,6 @@ if ! ls /etc/ssh/ssh_host_* 1> /dev/null 2>&1; then
 fi
 
 echo -e "${CYAN}"
-echo " ███╗   ███╗██╗   ██╗ ██████╗██████╗  ██████╗ ███████╗████████╗"
-echo " ████╗ ████║╚██╗ ██╔╝██╔════╝██╔══██╗██╔═══██╗██╔════╝╚══██╔══╝"
-echo " ██╔████╔██║ ╚████╔╝ ██║     ██████╔╝██║   ██║█████╗     ██║   "
-echo " ██║╚██╔╝██║  ╚██╔╝  ██║     ██╔══██╗██║   ██║██╔══╝     ██║   "
-echo " ██║ ╚═╝ ██║   ██║   ╚██████╗██║  ██║╚██████╔╝██║        ██║   "
-echo " ╚═╝     ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝        ╚═╝   "
-echo
 echo "        _____    _                          __   _   "
 echo "       |  __ \  (_)                        / _| | |  "
 echo "       | |__) |  _    ___   _ __    ___   | |_  | |_ "
@@ -734,19 +730,19 @@ echo -e "${RESET}"
 echo
 
 # Read the current mycroft-core version
-source mycroft-core/venv-activate.sh -q
-mycroft_core_ver=$(python -c "import mycroft.version; print('mycroft-core: '+mycroft.version.CORE_VERSION_STR)" && echo "steve" | grep -o "mycroft-core:.*")
-mycroft_core_branch=$(cd mycroft-core && git branch | grep -o "/* .*")
+source __core__/venv-activate.sh -q
+# mycroft_core_ver=$(python -c "import mycroft.version; print('mycroft-core: '+mycroft.version.CORE_VERSION_STR)" && echo "steve" | grep -o "mycroft-core:.*")
+# mycroft_core_branch=$(cd mycroft-core && git branch | grep -o "/* .*")
 
-echo "***********************************************************************"
-echo "** Picroft enclosure platform version:" $(<version)
-echo "**                       $mycroft_core_ver ( ${mycroft_core_branch/* /} )"
-echo "***********************************************************************"
-sleep 2  # give user a few moments to notice the version
+# echo "***********************************************************************"
+# echo "** Picroft enclosure platform version:" $(<version)
+# echo "**                       $mycroft_core_ver ( ${mycroft_core_branch/* /} )"
+# echo "***********************************************************************"
+# sleep 2  # give user a few moments to notice the version
 
 if [ -f ~/first_run ]
 then
-    $(bash "$HOME/mycroft-core/stop-mycroft.sh" all > /dev/null)
+    $(bash "$HOME/__core__/stop-mycroft.sh" all > /dev/null)
 
     if [ -z "$setup_stage" ] ; then
         echo
@@ -767,7 +763,7 @@ then
                 echo $key
                 echo
                 echo "Alright, have fun!"
-                echo "NOTE: If you decide to use the wizard later, just type 'mycroft-setup-wizard'"
+                echo "NOTE: If you decide to use the wizard later, just type 'core-setup-wizard'"
                 echo "      and reboot."
                 break
                 ;;
@@ -791,80 +787,6 @@ then
     rm ~/first_run
 fi
 
-# Special Matrix Voice Hat setup (multiple reboots required)
-if [ -f ~/.setup_matrix ]
-then
-    initial_setup=true
-    if [ ! -f matrix_setup_state.txt ]
-    then
-        echo ""
-        echo "========================================================================="
-        echo "Installing drivers for Matrix Voice Hat.  This process is automatic, but "
-        echo "requires several reboots.  Thanks for your patience!"
-        echo
-        sleep 2
-    else
-        echo "Continuing setup of Matrix Voice HAT"
-    fi
-
-    if [ ! -f matrix_setup_state.txt ]
-    then
-        echo "Adding Matrix repo and installing packages..."
-        # add repo
-        curl https://apt.matrix.one/doc/apt-key.gpg | sudo apt-key add -
-        echo "deb https://apt.matrix.one/raspbian $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/matrixlabs.list
-        sudo update-ca-certificates
-        sudo apt-get -o Acquire::ForceIPv4=true update -y
-        sudo apt-get -o Acquire::ForceIPv4=true upgrade -y
-
-        echo "Rebooting to apply kernel updates..."
-        echo "stage-1" > matrix_setup_state.txt
-        sleep 2
-        sudo reboot
-    else
-        matrix_setup_state=$( cat matrix_setup_state.txt)
-    fi
-
-    if [ $matrix_setup_state = "stage-1" ]
-    then
-        echo "Installing matrixio-kernel-modules..."
-        sudo apt install matrixio-kernel-modules -y
-
-        echo "Rebooting to apply audio subsystem changes..."
-        echo "stage-2" > matrix_setup_state.txt
-        sleep 2
-        sudo reboot
-    fi
-
-    if [ $matrix_setup_state = "stage-2" ]
-    then
-        echo "Setting Matrix as standard microphone..."
-        echo "========================================================================="
-        pactl list sources short
-        sleep 5
-        pulseaudio -k
-        pactl set-default-source 2
-        pulseaudio --start
-        save_volume 75%
-        sleep 2
-
-        mycroft-mic-test
-
-        read -p "${HIGHLIGHT}You should have heard the recording playback. Press enter to continue.${RESET}"
-
-        echo "========================================================================="
-        echo "Updating the Python virtual environment"
-        bash mycroft-core/dev_setup.sh
-
-        echo "stage-3" > matrix_setup_state.txt
-        echo "Your Matrix microphone is now setup! One more reboot to start Mycroft..."
-        sudo reboot
-    fi
-
-    rm ~/matrix_setup_state.txt
-    rm ~/.setup_matrix
-fi
-
 if [ "$SSH_CLIENT" = "" ] && [ "$(/usr/bin/tty)" = "/dev/tty1" ];
 then
     # running at the local console (e.g. plugged into the HDMI output)
@@ -881,7 +803,7 @@ then
     if [ -f audio_setup.sh ]
     then
         source audio_setup.sh
-        cd ~
+        cd ~ || exit
     fi
 
     # verify network settings
@@ -896,14 +818,14 @@ then
     if [ -f custom_setup.sh ]
     then
         source custom_setup.sh
-        cd ~
+        cd ~ || exit
     fi
 
-    # Auto-update to latest version of Picroft scripts and mycroft-core
+    # Auto-update to latest version of Picroft scripts and core
     update_software
     
-    # Launch Mycroft Services ======================
-    bash "$HOME/mycroft-core/start-mycroft.sh" all
+    # Launch core Services ======================
+    bash "$HOME/__core__/start-mycroft.sh" all
 
     # Display success/welcome message for user
     echo
@@ -919,10 +841,10 @@ then
         echo "where you can enter the pairing code."
         sleep 5
         read -p "${HIGHLIGHT}Press enter to launch the Mycroft CLI client.${RESET}"
-        "$HOME/mycroft-core/start-mycroft.sh" cli
+        "$HOME/__core__/start-mycroft.sh" cli
     else
-        echo "Mycroft is now starting in the background."
-        echo "To show the Mycroft command line interface type:  mycroft-cli-client"
+        echo "core is now starting in the background."
+        echo "To show the core command line interface type:  core-cli-client"
     fi
 
 else
@@ -931,10 +853,10 @@ else
     mycroft-help
     echo
     echo "***********************************************************************"
-    echo "In a few moments you will see the Mycroft CLI (command line interface)."
+    echo "In a few moments you will see the core CLI (command line interface)."
     echo "Hit Ctrl+C to return to the Linux command line.  You can launch the CLI"
-    echo "again by entering:  mycroft-cli-client"
+    echo "again by entering:  core-cli-client"
     echo
     sleep 2
-    "$HOME/mycroft-core/start-mycroft.sh" cli
+    "$HOME/__core__/start-mycroft.sh" cli
 fi
